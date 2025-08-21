@@ -98,7 +98,7 @@ def scrape_remoteok(keyword):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = requests.get(url, headers=headers, timeout=20)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -172,6 +172,17 @@ def save_individual_csv(jobs, keyword):
         print(f"❌ Error saving CSV for {keyword}: {e}")
         return None
 
+def clean_old_csv_files(keywords):
+    """Remove old CSV files with incorrect field names"""
+    for keyword in keywords:
+        filename = f"../results/csv/remoteok_{keyword}.csv"
+        if os.path.exists(filename):
+            try:
+                os.remove(filename)
+                print(f"🧹 Removed old CSV file: {filename}")
+            except Exception as e:
+                print(f"❌ Error removing {filename}: {e}")
+
 def combine_all_csvs(keywords):
     """Combine all individual CSV files into one big CSV"""
     all_jobs = []
@@ -183,9 +194,13 @@ def combine_all_csvs(keywords):
             try:
                 with open(filename, "r", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
-                    for row in reader:
-                        all_jobs.append(row)
-                print(f"📊 Added jobs from {filename}")
+                    # Check if the file has the correct headers
+                    if reader.fieldnames and "Job Title" in reader.fieldnames:
+                        for row in reader:
+                            all_jobs.append(row)
+                        print(f"📊 Added jobs from {filename}")
+                    else:
+                        print(f"⚠️  Skipping {filename} - incorrect format")
             except Exception as e:
                 print(f"❌ Error reading {filename}: {e}")
     
@@ -226,7 +241,13 @@ def main():
         "big-data", "hadoop", "spark", "kubernetes", "docker"
     ]
     
+    # Clean old CSV files first
+    print("🧹 Cleaning old CSV files...")
+    clean_old_csv_files(keywords)
+    print()
+    
     total_jobs = 0
+    successful_keywords = []
     
     print("🚀 Starting RemoteOK Scraping")
     print("=" * 50)
@@ -239,16 +260,17 @@ def main():
         if jobs:
             save_individual_csv(jobs, keyword)
             total_jobs += len(jobs)
+            successful_keywords.append(keyword)
             print(f"   Found {len(jobs)} jobs for {keyword}")
         else:
             print(f"   No jobs found for {keyword}")
         
         # Add delay to be respectful to the server
-        time.sleep(3)
+        time.sleep(4)  # Increased delay to avoid timeouts
     
-    # Combine all CSV files into one big CSV
+    # Combine only successful keyword CSV files
     if total_jobs > 0:
-        combine_all_csvs(keywords)
+        combine_all_csvs(successful_keywords)
         print(f"\n🎉 Total jobs scraped: {total_jobs}")
         print("📁 Files saved in:")
         print("   - Individual: ../results/csv/remoteok_*.csv")
