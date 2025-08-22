@@ -1,61 +1,64 @@
 import requests, csv, re, time, os
 from bs4 import BeautifulSoup
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
+# ---------- Setup ----------
 def setup_directories():
-    """Create necessary directories if they don't exist"""
     Path("../results/csv").mkdir(parents=True, exist_ok=True)
     Path("../results/csv/big_csv").mkdir(parents=True, exist_ok=True)
 
-def get_ai_category(title, description):
-    """Determine AI category based on keywords in title and description"""
-    text = f"{title} {description}".lower()
-    
-    categories = {
-        "Machine Learning": ["machine learning", "ml", "neural network", "deep learning"],
-        "NLP": ["nlp", "natural language", "text processing", "bert", "gpt", "chatgpt"],
-        "Computer Vision": ["computer vision", "image recognition", "opencv", "yolo", "vision transformer"],
-        "Generative AI": ["generative ai", "gpt-4", "llm", "large language model", "prompt engineering"],
-        "Robotics": ["robotics", "ros", "robot", "automation"],
-        "Data Science": ["data science", "data mining", "big data", "hadoop", "spark"],
-        "AI Ethics": ["responsible ai", "ai governance", "ai regulation", "ethical ai"]
+# ---------- AI Category ----------
+def get_ai_category_from_keyword(keyword):
+    category_mapping = {
+        # Generative AI
+        "chatgpt": "Generative AI", "generative": "Generative AI", "gpt-4": "Generative AI",
+        "prompt-engineering": "Generative AI", "llm": "Generative AI",
+        # Machine Learning
+        "machine-learning": "Machine Learning", "ml": "Machine Learning", 
+        "scikit-learn": "Machine Learning", "tensorflow": "Machine Learning",
+        "xgboost": "Machine Learning", "deep-learning": "Machine Learning",
+        "neural-networks": "Machine Learning", "reinforcement-learning": "Machine Learning",
+        "data-mining": "Machine Learning",
+        # NLP
+        "nlp": "NLP", "bert": "NLP", "text-analytics": "NLP",
+        "text-classification": "NLP", "natural-language-processing": "NLP",
+        # Computer Vision
+        "computer-vision": "Computer Vision", "image-recognition": "Computer Vision",
+        "opencv": "Computer Vision", "yolo": "Computer Vision", "vision-transformer": "Computer Vision",
+        # Robotics / RPA
+        "robo": "Robotics/RPA", "robotics": "Robotics/RPA", "ros": "Robotics/RPA",
+        "automation": "Robotics/RPA", "rpa": "Robotics/RPA",
+        # AI Ethics/Policy
+        "responsible-ai": "AI Ethics/Policy", "ai-governance": "AI Ethics/Policy", "ai-regulation": "AI Ethics/Policy",
+        # Data Science
+        "data-science": "Data Science", "big-data": "Data Science", "hadoop": "Data Science", "spark": "Data Science",
+        # DevOps
+        "kubernetes": "DevOps", "docker": "DevOps"
     }
-    
-    found_categories = []
-    for category, keywords in categories.items():
-        for keyword in keywords:
-            if re.search(rf"\b{keyword}\b", text, re.IGNORECASE):
-                found_categories.append(category)
-                break
-    
-    return ", ".join(found_categories) if found_categories else "Other AI"
+    return category_mapping.get(keyword, "Other AI")
 
-def get_sector(company_name, description):
-    """Assign sector based on company name or job description"""
-    text = f"{company_name} {description}".lower()
-    
-    sectors = {
-        "Technology": ["tech", "software", "ai", "machine learning", "data", "cloud"],
-        "Healthcare": ["health", "medical", "pharma", "biotech", "hospital"],
-        "Finance": ["finance", "bank", "investment", "insurance", "fintech"],
-        "E-commerce": ["ecommerce", "e-commerce", "retail", "shop", "marketplace"],
-        "Education": ["education", "edtech", "learning", "university", "school"],
-        "Manufacturing": ["manufacturing", "factory", "production", "industrial"],
-        "Consulting": ["consulting", "consultancy", "advisory"],
-        "Media": ["media", "entertainment", "publishing", "content"],
-        "Transportation": ["transport", "logistics", "shipping", "delivery"]
+# ---------- Sector Detection ----------
+def get_sector_from_text(text):
+    text = text.lower()
+    sector_keywords = {
+        "Healthcare": ["health", "medical", "pharma", "biotech", "hospital", "patient", "clinical", "healthcare"],
+        "Finance": ["finance", "bank", "investment", "insurance", "fintech", "financial", "trading", "wealth"],
+        "Marketing & Media": ["marketing", "media", "advertising", "social media", "content", "brand", "digital marketing"],
+        "Education": ["education", "edtech", "learning", "university", "school", "course", "training", "academic"],
+        "Legal & Compliance": ["legal", "compliance", "regulation", "law", "governance", "policy", "regulatory"],
+        "Technology & Software": ["tech", "software", "saas", "platform", "application", "system", "developer", "engineering"],
+        "Manufacturing & Logistics": ["manufacturing", "logistics", "supply chain", "production", "factory", "shipping", "distribution"],
+        "Government & Public Policy": ["government", "public", "policy", "federal", "state", "municipal", "public sector"]
     }
-    
-    for sector, keywords in sectors.items():
+    for sector, keywords in sector_keywords.items():
         for keyword in keywords:
-            if re.search(rf"\b{keyword}\b", text, re.IGNORECASE):
+            if re.search(rf"\b{keyword}\b", text):
                 return sector
-    
-    return "Other"
+    return "Other AI"
 
+# ---------- Skills Extraction ----------
 def extract_skills(description):
-    """Extract skills from job description"""
     skills_list = [
         "Python", "TensorFlow", "PyTorch", "SQL", "AWS", "GCP", "Azure", 
         "LangChain", "OpenCV", "RPA", "ChatGPT", "Generative AI", "LLM", 
@@ -65,37 +68,29 @@ def extract_skills(description):
         "Responsible AI", "AI governance", "AI regulation", "Machine Learning",
         "Deep Learning", "Computer Vision", "Natural Language Processing",
         "Data Science", "ML", "AI", "Neural Networks", "Reinforcement Learning",
-        "Data Mining", "Big Data", "Hadoop", "Spark", "Kubernetes", "Docker",
-        "JavaScript", "React", "Node.js", "Java", "C++", "Git", "Linux",
-        "MLflow", "Kubeflow", "Airflow", "Tableau", "Power BI", "Matplotlib",
-        "Seaborn", "Pandas", "NumPy", "Spark", "Hadoop", "Kafka", "Redis"
+        "Data Mining", "Big Data", "Hadoop", "Spark", "Kubernetes", "Docker"
     ]
-    
-    found_skills = [s for s in skills_list if re.search(rf"\b{s}\b", description, re.IGNORECASE)]
-    return ", ".join(found_skills)
+    found = [s for s in skills_list if re.search(rf"\b{s}\b", description, re.IGNORECASE)]
+    return ", ".join(found)
 
-def get_location(row):
-    """Extract location information if available"""
-    location_elem = row.select_one(".location")
-    if location_elem:
-        return location_elem.get_text(strip=True)
-    return "Remote"
+# ---------- Date Parsing ----------
+def parse_relative_date(relative_date):
+    try:
+        date_str = relative_date.replace("ago", "").strip()
+        if "d" in date_str:
+            days = int(date_str.replace("d", "").strip())
+            return (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        elif "h" in date_str:
+            return datetime.now().strftime("%Y-%m-%d")
+        else:
+            return datetime.now().strftime("%Y-%m-%d")
+    except:
+        return datetime.now().strftime("%Y-%m-%d")
 
-def get_date_posted(row):
-    """Extract date posted information"""
-    time_elem = row.select_one("time")
-    if time_elem and time_elem.get('datetime'):
-        return time_elem['datetime']
-    
-    # Fallback: current date
-    return datetime.now().strftime("%Y-%m-%d")
-
+# ---------- Scraper ----------
 def scrape_remoteok(keyword):
-    """
-    Scrapes RemoteOK for jobs matching a keyword.
-    """
     url = f"https://remoteok.com/remote-{keyword}-jobs"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
         resp = requests.get(url, headers=headers, timeout=20)
@@ -104,26 +99,23 @@ def scrape_remoteok(keyword):
 
         jobs = []
         for row in soup.select("tr.job"):
-            # Extract basic information
             title_elem = row.select_one("h2[itemprop='title']")
             company_elem = row.select_one("h3[itemprop='name']")
             desc_elem = row.select_one("td.description")
+            time_elem = row.select_one("td.time")
+            location_elem = row.select_one("div.location") or row.select_one("td.location")
             link = row.get("data-url")
-            
-            # Get text content
+
             title = title_elem.get_text(strip=True) if title_elem else "N/A"
             company = company_elem.get_text(strip=True) if company_elem else "N/A"
-            description = desc_elem.get_text(strip=True) if desc_elem else "N/A"
+            desc = desc_elem.get_text(strip=True) if desc_elem else "N/A"
             job_url = f"https://remoteok.com{link}" if link else "N/A"
-            
-            # Get additional information
-            location = get_location(row)
-            date_posted = get_date_posted(row)
-            
-            # Extract derived information
-            ai_category = get_ai_category(title, description)
-            sector = get_sector(company, description)
-            skills = extract_skills(description)
+            date_posted = parse_relative_date(time_elem.get_text(strip=True)) if time_elem else datetime.now().strftime("%Y-%m-%d")
+            location = location_elem.get_text(strip=True) if location_elem else "N/A"
+
+            ai_category = get_ai_category_from_keyword(keyword)
+            sector = get_sector_from_text(title + " " + desc)
+            skills = extract_skills(desc) if extract_skills(desc) else "None listed"
 
             jobs.append({
                 "Job Title": title,
@@ -131,152 +123,69 @@ def scrape_remoteok(keyword):
                 "AI Category": ai_category,
                 "Sector": sector,
                 "Skills Mentioned": skills,
-                "Job Description": description,
+                "Job Description": desc[:200],
                 "Date Posted": date_posted,
                 "Location": location,
                 "Source Website": "RemoteOK",
-                "Link to Job Post": job_url,
-                "Keyword": keyword
+                "Link to Job Post": job_url
             })
 
+
         return jobs
-    
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"❌ Error scraping {keyword}: {e}")
         return []
-    except Exception as e:
-        print(f"❌ Unexpected error scraping {keyword}: {e}")
-        return []
 
+# ---------- Save CSV ----------
 def save_individual_csv(jobs, keyword):
-    """Save jobs to individual CSV file"""
-    if not jobs:
-        return None
-        
+    if not jobs: return None
     filename = f"../results/csv/remoteok_{keyword}.csv"
-    
-    try:
-        with open(filename, "w", newline="", encoding="utf-8") as f:
-            fieldnames = [
-                "Job Title", "Company Name", "AI Category", "Sector", 
-                "Skills Mentioned", "Job Description", "Date Posted", 
-                "Location", "Source Website", "Link to Job Post", "Keyword"
-            ]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(jobs)
-        
-        print(f"✅ Saved {len(jobs)} {keyword} jobs to {filename}")
-        return filename
-    except Exception as e:
-        print(f"❌ Error saving CSV for {keyword}: {e}")
-        return None
+    with open(filename, "w", newline="", encoding="utf-8") as f:
+        fieldnames = ["Job Title","Company Name","AI Category","Sector","Skills Mentioned","Job Description","Date Posted","Location","Source Website","Link to Job Post"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(jobs)
+    print(f"✅ Saved {len(jobs)} {keyword} jobs to {filename}")
+    return filename
 
-def clean_old_csv_files(keywords):
-    """Remove old CSV files with incorrect field names"""
-    for keyword in keywords:
-        filename = f"../results/csv/remoteok_{keyword}.csv"
-        if os.path.exists(filename):
-            try:
-                os.remove(filename)
-                print(f"🧹 Removed old CSV file: {filename}")
-            except Exception as e:
-                print(f"❌ Error removing {filename}: {e}")
-
+# ---------- Combine CSV ----------
 def combine_all_csvs(keywords):
-    """Combine all individual CSV files into one big CSV"""
     all_jobs = []
-    
     for keyword in keywords:
         filename = f"../results/csv/remoteok_{keyword}.csv"
-        
         if os.path.exists(filename):
-            try:
-                with open(filename, "r", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    # Check if the file has the correct headers
-                    if reader.fieldnames and "Job Title" in reader.fieldnames:
-                        for row in reader:
-                            all_jobs.append(row)
-                        print(f"📊 Added jobs from {filename}")
-                    else:
-                        print(f"⚠️  Skipping {filename} - incorrect format")
-            except Exception as e:
-                print(f"❌ Error reading {filename}: {e}")
-    
-    if all_jobs:
-        big_csv_filename = "../results/csv/big_csv/remoteok_all_jobs.csv"
-        try:
-            with open(big_csv_filename, "w", newline="", encoding="utf-8") as f:
-                fieldnames = [
-                    "Job Title", "Company Name", "AI Category", "Sector", 
-                    "Skills Mentioned", "Job Description", "Date Posted", 
-                    "Location", "Source Website", "Link to Job Post", "Keyword"
-                ]
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(all_jobs)
-            
-            print(f"✅ Combined {len(all_jobs)} jobs into {big_csv_filename}")
-            return big_csv_filename
-        except Exception as e:
-            print(f"❌ Error saving combined CSV: {e}")
-            return None
-    else:
-        print("❌ No jobs to combine")
-        return None
+            with open(filename, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                all_jobs.extend(reader)
 
+    big_csv_filename = "../results/csv/big_csv/remoteok_all_jobs.csv"
+    with open(big_csv_filename, "w", newline="", encoding="utf-8") as f:
+        fieldnames = ["Job Title","Company Name","AI Category","Sector","Skills Mentioned","Job Description","Date Posted","Source Website","Link to Job Post","Keyword"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(all_jobs)
+    print(f"✅ Combined {len(all_jobs)} jobs into {big_csv_filename}")
+    return big_csv_filename
+
+# ---------- Main ----------
 def main():
-    """Main function to run the scraping process"""
     setup_directories()
-    
-    # List of keywords to scrape
-    keywords = [
-        "machine-learning", "nlp", "ai", "robo", "generative", "ml", "automation",
-        "chatgpt", "gpt-4", "prompt-engineering", "scikit-learn", "xgboost", "bert",
-        "text-analytics", "text-classification", "image-recognition", "opencv", "yolo",
-        "vision-transformer", "robotics", "ros", "responsible-ai", "ai-governance",
-        "ai-regulation", "deep-learning", "computer-vision", "natural-language-processing",
-        "data-science", "neural-networks", "reinforcement-learning", "data-mining",
-        "big-data", "hadoop", "spark", "kubernetes", "docker"
-    ]
-    
-    # Clean old CSV files first
-    print("🧹 Cleaning old CSV files...")
-    clean_old_csv_files(keywords)
-    print()
-    
+    keywords = ["chatgpt","machine-learning"]  # test small first
     total_jobs = 0
-    successful_keywords = []
-    
-    print("🚀 Starting RemoteOK Scraping")
-    print("=" * 50)
-    
-    # Scrape each keyword and save individual CSV files
-    for i, keyword in enumerate(keywords):
-        print(f"🔍 [{i+1}/{len(keywords)}] Scraping {keyword} jobs...")
+
+    for keyword in keywords:
+        print(f"🔍 Scraping {keyword}...")
         jobs = scrape_remoteok(keyword)
-        
         if jobs:
             save_individual_csv(jobs, keyword)
             total_jobs += len(jobs)
-            successful_keywords.append(keyword)
-            print(f"   Found {len(jobs)} jobs for {keyword}")
-        else:
-            print(f"   No jobs found for {keyword}")
-        
-        # Add delay to be respectful to the server
-        time.sleep(4)  # Increased delay to avoid timeouts
-    
-    # Combine only successful keyword CSV files
+        time.sleep(2)
+
     if total_jobs > 0:
-        combine_all_csvs(successful_keywords)
-        print(f"\n🎉 Total jobs scraped: {total_jobs}")
-        print("📁 Files saved in:")
-        print("   - Individual: ../results/csv/remoteok_*.csv")
-        print("   - Combined: ../results/csv/big_csv/remoteok_all_jobs.csv")
+        combine_all_csvs(keywords)
+        print(f"🎉 Total jobs scraped: {total_jobs}")
     else:
-        print("\n❌ No jobs were scraped from any keyword")
+        print("❌ No jobs were scraped")
 
 if __name__ == "__main__":
     main()
